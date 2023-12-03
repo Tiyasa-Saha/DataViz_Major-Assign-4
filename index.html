@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Major-Assignment-4</title>
+
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="/resources/demos/style.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+    <link rel="stylesheet" href="./css/style.css" />
+
+</head>
+
+<body>
+    <div id="app-container">
+        <div id="slider-container">
+            <p>
+                <label for="minmax">Min-Max Values:</label>
+                <input type="text" id="minmax" readonly style="border:0; color:#064597; font-weight:bold;">
+            </p>
+            <div id="slider-range"></div>
+        </div>
+
+        <div id='time'>
+        </div>
+
+        <div id="svg-container">
+            <svg width="100%" viewBox="0 0 800 600"></svg>
+        </div>
+    </div>
+
+    <script>
+        let svg = d3.select("svg");
+        const path = d3.geoPath();
+        let originalData;
+
+        function plot_contour(data, minThreshold, maxThreshold) {
+            // data dimensions
+            let m = 512, n = 512;
+
+            // Convert data into 1D list
+            let values_D = data.map(d => +d[0]);
+
+            const min_density = d3.min(values_D);
+            const max_density = d3.max(values_D);
+
+            // Diverging color scale
+            const colorScale = d3.scaleDiverging()
+                .domain([min_density, d3.mean([min_density, max_density]), max_density])
+                .interpolator(d3.interpolateRdBu);
+
+            // Contour generator
+            let contours = d3.contours()
+                .size([m, n])
+                .thresholds(d3.range(min_density, max_density, 80))
+                (values_D);
+
+            // Remove existing contours
+            svg.selectAll(".contours").remove();
+
+            // Append new contours to path (d)
+            svg.append("g").attr("class", "contours")
+                .selectAll("path")
+                .data(contours)
+                .enter()
+                .append("path")
+                .attr("d", function (d) { return path(d) })
+                .attr("stroke", "black")
+                .attr("stroke-width", ".1px")
+                .attr("stroke-linejoin", "round")
+                .attr("fill",
+                    function (d) {
+                        return colorScale(d.value)
+                    })
+                .attr("opacity", 0.7);
+
+            // Update density values
+            updateDetails(min_density, max_density);
+        }
+
+        function updateDetails(minValue, maxValue) {
+            // Update density values
+            console.log("Min Density:", minValue);
+            console.log("Max Density:", maxValue);
+        }
+
+        function filterData(minValue, maxValue) {
+            // Filter data based on the selected range
+            const filteredData = originalData.filter(d => +d[0] >= minValue && +d[0] <= maxValue);
+            plot_contour(filteredData, minValue, maxValue);
+        }
+
+        $(function () {
+            // Read csv file
+            const CT_data = "./data/Data_CT.csv"; // abstracted data file
+            d3.csv(CT_data).then(function (data) {
+                originalData = data;
+                const min_density = d3.min(data, d => +d[0]);
+                const max_density = d3.max(data, d => +d[0]);
+
+                $("#slider-range").slider({
+                    range: true,
+                    min: min_density,
+                    max: max_density,
+                    values: [min_density, max_density],
+                    slide: function (event, ui) {
+                        const minValue = ui.values[0];
+                        const maxValue = ui.values[1];
+                        $("#minmax").val(minValue + " - " + maxValue);
+
+                        // Filtering logic
+                        filterData(minValue, maxValue);
+                    }
+                });
+
+                $("#minmax").val($("#slider-range").slider("values", 0) +
+                    " - " + $("#slider-range").slider("values", 1));
+
+                plot_contour(data, min_density, max_density); // Initial plot with full range
+            });
+        });
+    </script>
+</body>
+
+</html>
